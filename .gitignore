@@ -3,3 +3,4 @@ group_project/data/reuters/articles
 .DS_Store
 group_project/data/reuters/articles_links
 group_project/data/reuters/reuters_articles
+.*/

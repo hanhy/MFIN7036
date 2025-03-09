@@ -2,7 +2,7 @@
 ### Word2Vec Model Training
 We first train a Word2Vec model using tokenized text data, so we experiment with different hyperparameters, including:
 ~~~python
-model = Word2Vec(sentences=test_data['content_tokens'], vector_size, window, min_count)
+model = Word2Vec(sentences=test_data['news'], vector_size, window, min_count)
 ~~~  
 - vector_size (70–90): Number of dimensions for word embeddings.
 - window (8–10): Context window size for training.
@@ -177,11 +177,12 @@ for cluster in range(num_clusters):
         print(f"No data for Cluster {cluster} Word Cloud")
 ~~~
 
+![alt text](image/ClusteringMD/wordcloud_cluster0.png)
+![alt text](image/ClusteringMD/wordcloud_cluster1.png)
+
 
 
 ### Sentiment Analysis
-
-
 
 
 #### VADER for general sentiment analysis
@@ -417,7 +418,7 @@ plt.grid(True, linestyle='--', alpha=0.7)
 plt.tight_layout()
 plt.show()
 ~~~
-![1741488759189](image/ClusteringMD/1741488759189.png)
+![alt text](image/ClusteringMD/result_vader.png)
 ##### Result from FinBert
 ~~~python
 # Visualize sentiment scores over time for each cluster
@@ -434,4 +435,4 @@ plt.grid(True, linestyle='--', alpha=0.7)
 plt.tight_layout()
 plt.show()
 ~~~
-![1741488768797](image/ClusteringMD/1741488768797.png)
+![alt text](image/ClusteringMD/result_finbert.png)

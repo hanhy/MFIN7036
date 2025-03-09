@@ -1,0 +1,437 @@
+## Clustering
+### Word2Vec Model Training
+We first train a Word2Vec model using tokenized text data, so we experiment with different hyperparameters, including:
+~~~python
+model = Word2Vec(sentences=test_data['content_tokens'], vector_size, window, min_count)
+~~~  
+- vector_size (70–90): Number of dimensions for word embeddings.
+- window (8–10): Context window size for training.
+- min_count (2–3): Minimum word frequency for inclusion in the vocabulary
+- N (10,20): To find the best number of important words that we should select from each document.
+**The goal of this part is to find the best parameters combination to find the meaningful words.**
+
+~~~python
+vector_sizes = [70, 80, 90]
+windows = [ 8, 9, 10]
+min_counts = [2, 3]  
+Ns = [10,20]
+
+best_silhouette_params = None
+best_silhouette_score = -1
+
+best_ch_params = None
+best_ch_score = -1
+
+for vector_size in vector_sizes:
+    for window in windows:
+        for min_count in min_counts:
+            for N in Ns:
+                model = Word2Vec(sentences=test_data['content_tokens'], vector_size=vector_size, window=window, min_count=min_count, workers=8)
+                
+                corpus = test_data['content'].tolist()
+                vectorizer = TfidfVectorizer()
+                tfidf_matrix = vectorizer.fit_transform(corpus)
+                word2tfidf = dict(zip(vectorizer.get_feature_names_out(), vectorizer.idf_))
+            
+                test_data['important_words'] = test_data['content_tokens'].apply(
+                    lambda tokens: sorted(
+                        set(tokens),  # Remove duplicates
+                        key=lambda x: word2tfidf.get(x, 0),  # Rank by TF-IDF score
+                        reverse=False  # Lower TF-IDF means higher frequency in this case
+                    )[:N]
+                )
+                
+                def text_to_vector(text, model, word2tfidf):
+                    vectors = []
+                    weights = []
+                    for word in text:
+                        if word in model.wv:
+                            vectors.append(model.wv[word])
+                            weights.append(word2tfidf.get(word, 1.0))
+                    if not vectors:
+                        return np.zeros(model.vector_size)
+                    vectors = np.array(vectors)
+                    weights = np.array(weights) / sum(weights)
+                    return np.average(vectors, axis=0, weights=weights)
+                
+                test_data['vector'] = test_data['important_words'].apply(lambda x: text_to_vector(x, model, word2tfidf))
+                
+                X = np.array(test_data['vector'].tolist())
+                num_clusters = 2
+                kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+                labels = kmeans.fit_predict(X)
+                test_data['cluster_label'] = labels
+                
+                if len(set(labels)) > 1:
+                    silhouette = silhouette_score(X, labels)
+                    ch_score = calinski_harabasz_score(X, labels)
+                    
+                    if silhouette > best_silhouette_score: 
+                        best_silhouette_score = silhouette
+                        best_silhouette_params = (vector_size, window, min_count, N)
+                    
+                    if ch_score > best_ch_score:
+                        best_ch_score = ch_score
+                        best_ch_params = (vector_size, window, min_count, N)
+                        
+print(f"Best Silhouette parameters: Vector Size={best_silhouette_params[0]}, Window={best_silhouette_params[1]}, Min Count={best_silhouette_params[2]}, N={best_silhouette_params[3]}")
+print(f"Best Calinski-Harabasz parameters: Vector Size={best_ch_params[0]}, Window={best_ch_params[1]}, Min Count={best_ch_params[2]}, N={best_ch_params[3]}")
+~~~
+
+### Clusterind by K-means
+#### Extracting Important Words with TF-IDF
+- After training Word2Vec, we compute TF-IDF scores to determine important words in each document.
+- We select the 20 most frequent words per article (based on inverse TF-IDF scores).
+
+#### Converting Text into Feature Vectors
+- Each document is represented as a weighted average of its word embeddings, using TF-IDF scores as weights.
+- This transforms unstructured text into **numerical vectors** suitable for clustering.
+
+#### K-Means Clustering
+- We apply K-Means clustering with num_clusters = 2 to group documents.
+#### Evaluating Clustering Performance
+- We use two metrics:
+    1. Silhouette Score: Measures how well clusters are separated.
+    2. Calinski-Harabasz Score: Evaluates the compactness of clusters.
+- The best hyperparameters are chosen based on these scores.
+~~~python
+# Step 1: Train Word2Vec model on tokenized words
+model = Word2Vec(sentences=test_data['content_tokens'], vector_size=80, window=9, min_count=2, workers=8) #use the loop function to find the best parameters
+
+
+# Step 2: Compute TF-IDF weights for all words in the dataset
+corpus = test_data['content'].tolist()  
+vectorizer = TfidfVectorizer()
+tfidf_matrix = vectorizer.fit_transform(corpus)
+word2tfidf = dict(zip(vectorizer.get_feature_names_out(), vectorizer.idf_))
+
+# Step 3: Identify high-frequency words per article
+N = 20 # Number of top words per article, N also be found by the loop function
+test_data['important_words'] = test_data['content_tokens'].apply(
+    lambda tokens: sorted(
+        set(tokens),  # Remove duplicates
+        key=lambda x: word2tfidf.get(x, 0),  # Rank by TF-IDF score
+        reverse=False  # Lower TF-IDF means higher frequency in this case
+    )[:N]
+)
+
+# Step 4: Define a function to convert text to a weighted vector, use the word2vec model and the TF-IDF weights
+def text_to_vector(text, model, word2tfidf):
+    vectors = []
+    weights = []
+    for word in text:
+        if word in model.wv:
+            vectors.append(model.wv[word])
+            weights.append(word2tfidf.get(word, 1.0))  # Default weight 1.0 if not in TF-IDF
+    if not vectors:
+        return np.zeros(model.vector_size)
+    vectors = np.array(vectors)
+    weights = np.array(weights) / sum(weights)  # Normalize weights
+    return np.average(vectors, axis=0, weights=weights)
+
+# Step 5: Convert important words to vectors
+test_data['vector'] = test_data['important_words'].apply(lambda x: text_to_vector(x, model, word2tfidf))
+
+# Step 6: Use the k-means algorithm to cluster the articles, split the data into two groups.
+X = np.array(test_data['vector'].tolist())
+num_clusters = 2  # Number of clusters
+kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+labels = kmeans.fit_predict(X)
+test_data['cluster_label'] = labels
+~~~
+
+### WordCloud of Each Clusters
+**Get the WordCloud for each clusture's high frequent words, to see the detail of each clusture directly.**
+~~~python
+# Function to generate word cloud
+def plot_word_cloud(text, title):
+    """Generate and display a word cloud for the given text."""
+    # Filter out stop words and non-alphabetic tokens
+    words = ' '.join(word for word in text.split() if word.lower() not in stop_words and word.isalpha() and len(word) > 2)
+    if not words.strip():
+        print(f"No valid words for word cloud in {title}")
+        return
+    wordcloud = WordCloud(
+        width=800, 
+        height=400, 
+        background_color='white', 
+        max_words=100, 
+        min_font_size=10,
+        stopwords=stop_words
+    ).generate(words)
+    
+    plt.figure(figsize=(10, 5))
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.title(title)
+    plt.axis('off')
+    plt.show()
+
+# Generate word clouds for each cluster
+for cluster in range(num_clusters):
+    # Merge important_words for the cluster into a single string, removing duplicates
+    cluster_words = set(word for item in test_data[test_data['cluster_label'] == cluster]['important_words'].dropna() for word in item)
+    cluster_text = ' '.join(cluster_words)
+    if cluster_text.strip():
+        plot_word_cloud(cluster_text, f'Cluster {cluster} Word Cloud')
+    else:
+        print(f"No data for Cluster {cluster} Word Cloud")
+~~~
+
+
+
+### Sentiment Analysis
+
+
+
+
+#### VADER for general sentiment analysis
+##### Function
+VADER is a lexicon and rule-based sentiment analysis tool. It is specifically designed to analyze the sentiment of text in social media and other informal contexts. It works by looking at the words and phrases in the text, and then assigning sentiment scores based on a pre-defined dictionary of sentiment-laden words and a set of rules for combining those scores.
+##### Advantages
+- **Suitable for general Text:** It performs extremely well on social media posts, tweets, and other informal text where the language may be more casual and use a lot of slang or abbreviations. It has been trained and optimized to handle the unique characteristics of such text, making it more accurate in these contexts compared to some other sentiment analysis tools.
+- **Fast and Efficient:** VADER is relatively fast in processing text. It doesn't require a lot of computational resources and can quickly analyze large volumes of text, making it suitable for applications where real-time or near-real-time sentiment analysis is needed, such as monitoring social media trends.
+
+
+~~~python
+# Sentiment Analysis
+# Method 1: Use VADER to analyze sentiment of important words in each cluster
+test_data['date'] = pd.to_datetime(test_data['date'])
+grouped = test_data.groupby('date')
+
+# Initialize VADER sentiment analyzer
+analyzer = SentimentIntensityAnalyzer()
+# Store daily sentiment results for each cluster
+sentiment_results = []
+
+for date, group in grouped:
+    for cluster in range(num_clusters):
+        cluster_data = group[group['cluster_label'] == cluster]
+        sentiment_scores = []
+
+        for important_words in cluster_data['important_words'].dropna():
+            if isinstance(important_words, list):
+                words = [word for word in important_words if word.lower() not in stop_words and word.isalpha() and len(word) > 2]
+            else:
+                continue  
+            
+            if not words:
+                continue  
+
+            # calculate word weights based on TF-IDF scores
+            word_weights = np.array([word2tfidf.get(word, 1.0) for word in words])
+            
+            # Normalize word weights to sum to 1
+            if word_weights.sum() == 0:
+                word_weights = np.ones_like(word_weights) / len(word_weights)
+            else:
+                word_weights /= word_weights.sum()
+
+            text = " ".join(words)
+
+            try:
+                sentiment = analyzer.polarity_scores(text)
+                compound_score = sentiment['compound']
+                positive_score = sentiment['pos']
+                negative_score = sentiment['neg']
+                neutral_score = sentiment['neu']
+
+                # Calculate weighted sentiment scores
+                weighted_sentiment = {
+                    'compound': compound_score * word_weights.sum(),
+                    'positive': positive_score * word_weights.sum(),
+                    'negative': negative_score * word_weights.sum(),
+                    'neutral': neutral_score * word_weights.sum()
+                }
+
+                sentiment_scores.append(weighted_sentiment)
+            
+            except Exception as e:
+                print(f"Error processing text for date {date}, cluster {cluster}: {text[:50]}..., Error: {e}")
+                continue
+
+
+        # Calculate average sentiment scores
+        if sentiment_scores:
+            avg_sentiment = {
+                'compound': np.average([s['compound'] for s in sentiment_scores], weights=[word_weights.sum()] * len(sentiment_scores)),
+                'positive': np.average([s['positive'] for s in sentiment_scores], weights=[word_weights.sum()] * len(sentiment_scores)),
+                'negative': np.average([s['negative'] for s in sentiment_scores], weights=[word_weights.sum()] * len(sentiment_scores)),
+                'neutral': np.average([s['neutral'] for s in sentiment_scores], weights=[word_weights.sum()] * len(sentiment_scores))
+            }
+
+            sentiment_results.append({
+                'date': date,
+                'cluster': cluster,
+                'sentiment_score': avg_sentiment['compound'],
+                'positive_score': avg_sentiment['positive'],
+                'negative_score': avg_sentiment['negative'],
+                'neutral_score': avg_sentiment['neutral'],
+                'num_samples': len(sentiment_scores)
+            })
+        else:
+            sentiment_results.append({
+                'date': date,
+                'cluster': cluster,
+                'sentiment_score': 0.0,
+                'positive_score': 0.0,
+                'negative_score': 0.0,
+                'neutral_score': 0.0,
+                'num_samples': 0
+            })
+
+# Create DataFrame from sentiment results
+vade_sentiment_df = pd.DataFrame(sentiment_results)
+
+# Print results
+print("\nSentiment Analysis Results:")
+vade_sentiment_df
+~~~
+
+
+#### FinBERT for financial sentiment analysis
+##### Function
+FinBERT is a sentiment analysis model based on the BERT (Bidirectional Encoder Representations from Transformers) architecture, specifically fine-tuned for financial text. It is used to analyze the sentiment of financial news, reports, earnings calls, and other financial-related text. It can understand the context and semantics of financial language, and classify the text into positive, negative, or neutral sentiment categories. 
+##### Advantages
+- **High Accuracy in Financial Domain:** Due to its fine-tuning on financial data, FinBERT has a high level of accuracy in understanding and analyzing the sentiment of financial text. It can handle complex financial jargon, industry-specific terms, and the unique semantic nuances of financial language better than general sentiment analysis models, providing more reliable results for financial applications.
+- **Contextual Understanding:** Similar to other BERT-based models, FinBERT has a strong ability to understand the context of the text. It can consider the surrounding words and sentences to determine the sentiment of a particular word or phrase, which is crucial in financial text where the meaning of a word can often depend on the context. For example, the word "increase" might have different sentiment implications depending on whether it's about a company's profits or its debt.
+- **Generalization Ability:** FinBERT can generalize well to different types of financial text, including news articles, social media discussions about finance, and financial reports. It can handle a wide range of text styles and sources, making it a versatile tool for sentiment analysis in the financial industry.
+~~~python
+# Method 2: Use FinBERT for sentiment analysis
+test_data['date'] = pd.to_datetime(test_data['date'])
+grouped = test_data.groupby('date')
+
+# Load FinBERT model and tokenizer
+model_name = "yiyanghkust/finbert-tone"  # FinBERT model fine-tuned for financial sentiment
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForSequenceClassification.from_pretrained(model_name)
+
+# Create a sentiment analysis pipeline with FinBERT
+sentiment_analyzer = pipeline(
+    "sentiment-analysis",
+    model=model,
+    tokenizer=tokenizer,
+    return_all_scores=True  # Return probabilities for all labels
+)
+
+# Function to process text and get FinBERT sentiment
+def get_finbert_sentiment(text, max_length=512):
+    """Get sentiment scores using FinBERT, handling text truncation if necessary."""
+    if not text or not isinstance(text, str):
+        return {'positive': 0.0, 'negative': 0.0, 'neutral': 0.0}
+    
+    # Truncate text if longer than max_length to avoid errors
+    if len(text.split()) > max_length:
+        text = " ".join(text.split()[:max_length])
+    
+    try:
+        result = sentiment_analyzer(text)[0]  # Get the first (and only) result
+        scores = {item['label'].lower(): item['score'] for item in result}
+        # Ensure all labels (positive, negative, neutral) are present
+        return {
+            'positive': scores.get('positive', 0.0),
+            'negative': scores.get('negative', 0.0),
+            'neutral': scores.get('neutral', 0.0)
+        }
+    except Exception as e:
+        print(f"Error processing text with FinBERT: {text[:50]}..., Error: {e}")
+        return {'positive': 0.0, 'negative': 0.0, 'neutral': 0.0}
+
+# Store daily sentiment results for each cluster
+sentiment_results = []
+
+for date, group in grouped:
+    for cluster in range(num_clusters):
+        cluster_data = group[group['cluster_label'] == cluster]
+        sentiment_scores = []
+
+        for important_words in cluster_data['important_words'].dropna():
+            # Ensure important_words is a list; if it's a string, split it
+            if isinstance(important_words, str):
+                words = [word for word in important_words.split() if word.lower() not in stop_words and word.isalpha() and len(word) > 2]
+            elif isinstance(important_words, list):
+                words = [word for word in important_words if word.lower() not in stop_words and word.isalpha() and len(word) > 2]
+            else:
+                continue  # Skip invalid data
+
+            if not words:
+                continue  # Skip if no valid words after filtering
+
+            text = " ".join(words)
+
+            # Get sentiment scores using FinBERT
+            sentiment = get_finbert_sentiment(text)
+            sentiment_scores.append(sentiment)
+
+        # Calculate average sentiment scores
+        if sentiment_scores:
+            avg_sentiment = {
+                'positive': np.mean([s['positive'] for s in sentiment_scores]),
+                'negative': np.mean([s['negative'] for s in sentiment_scores]),
+                'neutral': np.mean([s['neutral'] for s in sentiment_scores])
+            }
+            # Calculate a compound-like score (e.g., positive - negative)
+            compound_score = avg_sentiment['positive'] - avg_sentiment['negative']
+            sentiment_results.append({
+                'date': date,
+                'cluster': cluster,
+                'sentiment_score': compound_score,  # Use positive - negative as compound score
+                'positive_score': avg_sentiment['positive'],
+                'negative_score': avg_sentiment['negative'],
+                'neutral_score': avg_sentiment['neutral'],
+                'num_samples': len(sentiment_scores)
+            })
+        else:
+            sentiment_results.append({
+                'date': date,
+                'cluster': cluster,
+                'sentiment_score': 0.0,
+                'positive_score': 0.0,
+                'negative_score': 0.0,
+                'neutral_score': 0.0,
+                'num_samples': 0
+            })
+
+# Create DataFrame from sentiment results
+sentiment_df = pd.DataFrame(sentiment_results)
+
+# Print results
+print("\nSentiment Analysis Results (FinBERT):")
+sentiment_df
+~~~
+#### Result
+Each date - cluster pair is associated with an average sentiment score. A comparison of the results obtained from VADER and FinBERT reveals that Cluster 0 has a higher proportion of positive scores than Cluster 1. Moreover, the results from FinBERT appear to be more accurate or of better quality than those from VADER.
+##### Result from VADER
+~~~python
+# Visualize sentiment scores over time for each cluster
+plt.figure(figsize=(12, 6))
+for cluster in range(num_clusters):
+    cluster_data = vade_sentiment_df[vade_sentiment_df['cluster'] == cluster]
+    plt.plot(cluster_data['date'], cluster_data['sentiment_score'], label=f'Cluster {cluster}', marker=None, linestyle='-', linewidth=2)
+
+plt.title('VADER: Sentiment Trends Over Time by Cluster (Weighted Score)')
+plt.xlabel('Date')
+plt.ylabel('Compound Sentiment Score')
+plt.legend()
+plt.xticks(rotation=45, ha='right')  
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.tight_layout()
+plt.show()
+~~~
+![1741488759189](image/ClusteringMD/1741488759189.png)
+##### Result from FinBert
+~~~python
+# Visualize sentiment scores over time for each cluster
+plt.figure(figsize=(12, 6))
+for cluster in range(num_clusters):
+    cluster_data = sentiment_df[sentiment_df['cluster'] == cluster]
+    plt.plot(cluster_data['date'], cluster_data['sentiment_score'], label=f'Cluster {cluster}', marker=None, linestyle='-', linewidth=2)
+plt.title('FinBert: Sentiment Trends Over Time by Cluster')
+plt.xlabel('Date')
+plt.ylabel('Compound Sentiment Score')
+plt.legend()
+plt.xticks(rotation=45, ha='right')  # Rotate x-axis labels for better readability
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.tight_layout()
+plt.show()
+~~~
+![1741488768797](image/ClusteringMD/1741488768797.png)

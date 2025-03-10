@@ -177,8 +177,8 @@ for cluster in range(num_clusters):
         print(f"No data for Cluster {cluster} Word Cloud")
 ~~~
 
-![alt text](image/ClusteringMD/wordcloud_cluster0.png)
-![alt text](image/ClusteringMD/wordcloud_cluster1.png)
+![1741589023317](image/ClusteringMD/1741589023317.png)
+![1741589035208](image/ClusteringMD/1741589035208.png)
 
 
 
@@ -418,7 +418,7 @@ plt.grid(True, linestyle='--', alpha=0.7)
 plt.tight_layout()
 plt.show()
 ~~~
-![alt text](image/ClusteringMD/result_vader.png)
+![1741589089783](image/ClusteringMD/1741589089783.png)
 ##### Result from FinBert
 ~~~python
 # Visualize sentiment scores over time for each cluster
@@ -435,4 +435,4 @@ plt.grid(True, linestyle='--', alpha=0.7)
 plt.tight_layout()
 plt.show()
 ~~~
-![alt text](image/ClusteringMD/result_finbert.png)
+![1741589163424](image/ClusteringMD/1741589163424.png)

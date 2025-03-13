@@ -33,7 +33,20 @@ pip install -r requirements.txt
   - VC1.csv: Document stock return, interest rate, key economic event date, and sentiment scores of VADER of Cluster 1
   - FC0.csv: Document stock return, interest rate, key economic event date, and sentiment scores of FinBert of Cluster 0
   - FC1.csv: Document stock return, interest rate, key economic event date, and sentiment scores of FinBert of Cluster 1
+  - finbert_sentiment_analysis_results_update: Sentiment scores of FinBert after clustering
+- ouput:
+  - Mkt_P2_Adjusted_close_prices: Adjusted close prices for all tickers
+  - Mkt_P2_Daily_returns: Discrete daily returns for all tickers
+  - Mkt_P2_Align_sentiment_clusters_with_market_data: Result of merging news sentiment scores with market data (including adjusted close prices and discrete daily returns)
 - Mkt_P1_Linear_Regression.ipynb: Codes run linear regressions of stock return and sentiment score of each method of each Cluster
+- Mkt_P2_Data-driven_Trading_Strategy:
+  - Step 1: Import necessary modules
+  - Step 2: Get market data
+  - Step 3: Merge news sentiment with market data
+  - Step 4: Trading Strategy
+    - Strategy 1: Cluster-Based Strategy
+    - Strategy 2: Sentiment Momentum Strategy
+    - Strategy 3: VIX-Sentiment Mean Reversion
 
 ## Scraper Structure
 ![Scraper](https://github.com/user-attachments/assets/7de4f630-b9a9-4ab9-9850-500e35c80016)

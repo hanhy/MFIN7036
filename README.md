@@ -15,7 +15,7 @@ pip install -r requirements.txt
 - output : Scraped result sample
 
 ### preprocessing
-- Inout data : Raw news articles collected from Reuters (stored in JSON format)
+- Input data : Raw news articles collected from Reuters (stored in JSON format)
 - Preprocessing.ipynb :  Text cleaning, lemmotization, tokenization and filtering
 - output : Cleaned dataset in CSV format 
 

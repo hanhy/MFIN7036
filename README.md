@@ -28,7 +28,12 @@ pip install -r requirements.txt
 - cluster_sentiment.ipynb: Clustering and Sentiment Analysis
 - find_parameter.ipynb: Model training to find the optional parameters of Word2Vec model
 ### market_analysis
-
+- data:
+  - VC0.csv: Document stock return, interest rate, key economic event date, and sentiment scores of VADER of Cluster 0
+  - VC1.csv: Document stock return, interest rate, key economic event date, and sentiment scores of VADER of Cluster 1
+  - FC0.csv: Document stock return, interest rate, key economic event date, and sentiment scores of FinBert of Cluster 0
+  - FC1.csv: Document stock return, interest rate, key economic event date, and sentiment scores of FinBert of Cluster 1
+- Mkt_P1_Linear_Regression.ipynb: Codes run linear regressions of stock return and sentiment score of each method of each cluster
 
 ## Scraper Structure
 ![Scraper](https://github.com/user-attachments/assets/7de4f630-b9a9-4ab9-9850-500e35c80016)

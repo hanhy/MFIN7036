@@ -13,6 +13,7 @@ pip install -r requirements.txt
 - fetch_links.ipynb : Scrape and parse links
 - fetch_article.ipynb : Scrape and parse artiles
 - output : Scraped result sample
+- scripts : Some support scripts
 
 ### preprocessing
 - Input data : Raw news articles collected from Reuters (stored in JSON format)

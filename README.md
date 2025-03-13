@@ -21,8 +21,8 @@ pip install -r requirements.txt
   - finbert_sentiment_analysis_results.csv: Sentiment scores of FinBert
   - vader_sentiment_analysis_result.csv: Sentiment scores of VADER
   - invalid_dates_sample_counts: Invalid date with number of news below 30
-- cluster_sentiment: Clustering and Sentiment Analysis
-- find_parameter: Model training to find the optional parameters of Word2Vec model
+- cluster_sentiment.ipynb: Clustering and Sentiment Analysis
+- find_parameter.ipynb: Model training to find the optional parameters of Word2Vec model
 ### market_analysis
 
 
